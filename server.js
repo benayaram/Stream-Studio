@@ -3,19 +3,20 @@ const bodyParser = require('body-parser');
 const { spawn, exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+require('dotenv').config(); // Load environment variables
 
 const multer = require('multer');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.static('public'));
 app.use(bodyParser.json());
 
 // ============ CONFIGURATION ============
-const TARGET_URL = "rtmp://a.rtmp.youtube.com/live2";
-const STREAM_KEY = "wg0v-kakk-1quj-yadm-2ac0";
-const PROXY = ""; // Add Proxy URL here if needed (e.g., "http://user:pass@ip:port")
+const TARGET_URL = process.env.TARGET_URL;
+const STREAM_KEY = process.env.STREAM_KEY;
+const PROXY = process.env.PROXY || "";
 // =======================================
 
 // Path pointers
@@ -187,7 +188,16 @@ function startStream(sourceLink, layout, seekTime = 0) {
     console.log(`🚀 Starting Stream. Seek: ${seekTime}s. Layout: X=${layout.x}, Y=${layout.y}, W=${layout.w}, H=${layout.h}`);
 
     // 1. Configure Downloader (yt-dlp)
-    let dlArgs = ['-o', '-', '-f', 'best[height<=1080]', '--no-part'];
+    // Try to look like a real browser to avoid "Sign in" errors
+    const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+    let dlArgs = [
+        '-o', '-',
+        '-f', 'best[height<=1080]',
+        '--no-part',
+        '--user-agent', userAgent,
+        '--referer', 'https://www.youtube.com/'
+    ];
 
     // Add Seek if restarting (Using download-sections for VOD/Live seek)
     // Note: LIVE streams might behave differently, but this is the standard 'resume' method for yt-dlp
@@ -196,6 +206,14 @@ function startStream(sourceLink, layout, seekTime = 0) {
     }
 
     if (PROXY) dlArgs.push('--proxy', PROXY);
+
+    // CHECK FOR COOKIES (Fixes "Sign in to confirm you’re not a bot")
+    const cookiesPath = path.join(__dirname, 'cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+        console.log("🍪 Found cookies.txt! Using for authentication.");
+        dlArgs.push('--cookies', cookiesPath);
+    }
+
     dlArgs.push(sourceLink);
 
     activeProcess.dl = spawn(ytPath, dlArgs);
