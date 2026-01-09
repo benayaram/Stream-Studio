@@ -54,6 +54,52 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// --- COOKIE HELPER (Fixes JSON format from extensions) ---
+function ensureNetscapeCookies() {
+    const p = path.join(__dirname, 'cookies.txt');
+    let content = "";
+
+    // 1. Try ENV first (Best for Render/Security)
+    if (process.env.YOUTUBE_COOKIES) {
+        content = process.env.YOUTUBE_COOKIES;
+    }
+    // 2. Try Local File
+    else if (fs.existsSync(p)) {
+        content = fs.readFileSync(p, 'utf8');
+    } else {
+        return; // No cookies found
+    }
+
+    // 3. Check if JSON and Convert
+    if (content.trim().startsWith('[')) {
+        console.log("🍪 Detected JSON cookies. Converting to Netscape format for yt-dlp...");
+        try {
+            const cookies = JSON.parse(content);
+            let netscape = "# Netscape HTTP Cookie File\n";
+            cookies.forEach(c => {
+                const domain = c.domain;
+                const flag = domain.startsWith('.') ? 'TRUE' : 'FALSE';
+                const path = c.path;
+                const secure = c.secure ? 'TRUE' : 'FALSE';
+                const expiration = Math.round(c.expirationDate || (Date.now() / 1000 + 31536000));
+                const name = c.name;
+                const value = c.value;
+                netscape += `${domain}\t${flag}\t${path}\t${secure}\t${expiration}\t${name}\t${value}\n`;
+            });
+            fs.writeFileSync(p, netscape);
+            console.log("✅ Cookies converted and saved to cookies.txt");
+        } catch (e) {
+            console.error("❌ Failed to convert cookies:", e.message);
+        }
+    } else if (process.env.YOUTUBE_COOKIES) {
+        // If ENV was plain text, write it to file so yt-dlp can read it
+        fs.writeFileSync(p, content);
+    }
+}
+// Run immediately on start
+ensureNetscapeCookies();
+
+
 // Endpoint to upload a new overlay
 app.post('/api/upload', upload.single('overlayImage'), (req, res) => {
     if (!req.file) {
