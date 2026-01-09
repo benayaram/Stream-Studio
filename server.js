@@ -279,8 +279,9 @@ color=s=1080x1920:c=black[bg];
 
         '-filter_complex', filterComplex,
 
-        '-c:v', 'libx264', '-preset', 'ultrafast', // fast preset for local test
-        '-b:v', '4500k', '-maxrate', '5000k', '-bufsize', '10000k',
+        '-c:v', 'libx264', '-preset', 'veryfast', // 'veryfast' uses less CPU than 'ultrafast' for similar quality, or keep ultrafast if CPU is really tight
+        '-tune', 'zerolatency', // Crucial for low latency and stability
+        '-b:v', '3000k', '-maxrate', '3500k', '-bufsize', '6000k', // Lowered bitrate for stability
         '-pix_fmt', 'yuv420p', '-g', '60',
 
         '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
