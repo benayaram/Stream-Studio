@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Studio Pro</title>
+    <link rel="icon" href="/favicon.png" type="image/png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #0d0d11;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --primary-gradient: linear-gradient(135deg, #00f260 0%, #0575E6 100%);
+            --danger-gradient: linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%);
+            --warn-gradient: linear-gradient(135deg, #FF9966 0%, #FF5E62 100%);
+            --purple-gradient: linear-gradient(135deg, #c471ed 0%, #f64f59 100%);
+            --text-color: #ffffff;
+            --accent-color: #0575E6;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 2rem;
+            min-height: 100vh;
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(5, 117, 230, 0.1) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(0, 242, 96, 0.05) 0%, transparent 20%);
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* CARD SYSTEM */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.1rem;
+            color: #ccc;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* LEFT COLUMN (Inputs + Controls) */
+        .left-col {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            flex: 1;
+            min-width: 300px;
+            max-width: 450px;
+        }
+
+        /* RIGHT COLUMN (Preview) */
+        .right-col {
+            flex: 0 0 auto;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 10px rgba(5, 117, 230, 0.3);
+        }
+
+        /* BUTTONS */
+        button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* TOGGLE BUTTON STYLES */
+        .btn-toggle-start {
+            background: var(--primary-gradient);
+            box-shadow: 0 4px 20px rgba(0, 242, 96, 0.3);
+            font-size: 1.2rem;
+            /* Bigger */
+        }
+
+        .btn-toggle-stop {
+            background: var(--danger-gradient);
+            box-shadow: 0 4px 20px rgba(255, 65, 108, 0.3);
+            font-size: 1.2rem;
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 65, 108, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(255, 65, 108, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 65, 108, 0);
+            }
+        }
+
+        .btn-upload {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            color: #ccc;
+        }
+
+        .btn-upload:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #fff;
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #ccc;
+            font-size: 0.9rem;
+            padding: 12px;
+        }
+
+        .btn-secondary:hover {
+            background: #444;
+            color: white;
+        }
+
+        .btn-update {
+            background: var(--warn-gradient);
+            box-shadow: 0 4px 15px rgba(255, 153, 102, 0.3);
+        }
+
+        .btn-change-source {
+            background: var(--purple-gradient);
+            box-shadow: 0 4px 15px rgba(196, 113, 237, 0.3);
+        }
+
+        /* STATUS */
+        #status-bar {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #555;
+            transition: all 0.3s;
+        }
+
+        .status-dot.active {
+            background-color: #00f260;
+            box-shadow: 0 0 10px #00f260;
+        }
+
+        /* EDITOR CANVAS */
+        .editor-wrapper {
+            position: relative;
+            padding: 4px;
+            background: linear-gradient(45deg, #222, #444);
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        #editor-container {
+            position: relative;
+            width: 360px;
+            height: 640px;
+            background-color: #000;
+            background-image: url('/overlay_preview');
+            background-size: cover;
+            background-position: center;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        /* DRAGGABLE VIDEO BOX */
+        #video-box {
+            position: absolute;
+            top: 100px;
+            left: 50px;
+            width: 260px;
+            height: 146px;
+
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid #ff4444;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.2);
+            backdrop-filter: blur(2px);
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            border-radius: 8px;
+        }
+
+        #video-box:hover {
+            background: rgba(255, 0, 0, 0.4);
+            border-color: #ff6666;
+        }
+
+        .resizer {
+            width: 24px;
+            height: 24px;
+            background: white;
+            border: 2px solid #ff4444;
+            position: absolute;
+            right: -8px;
+            bottom: -8px;
+            cursor: se-resize;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .resizer:hover {
+            transform: scale(1.2);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Stream Studio <span style="font-size: 0.5em; color: var(--accent-color); vertical-align: super;">Pro</span></h1>
+
+    <!-- LEFT COLUMN: CONTROLS -->
+    <div class="left-col">
+
+        <!-- CARD 1: MAIN CONTROL (START/STOP) -->
+        <div class="card" id="control-card">
+            <div class="card-title">📡 Broadcast Control</div>
+
+            <div id="status-bar">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">OFFLINE</span>
+            </div>
+
+            <!-- THE BIG TOGGLE BUTTON -->
+            <button id="btn-toggle" class="btn-toggle-start" onclick="toggleStream()">
+                ▶ START STREAM
+            </button>
+        </div>
+
+        <!-- CARD 2: SOURCE CONFIG -->
+        <div class="card" id="source-card">
+            <div class="card-title">🔗 Source Setting</div>
+            <input type="text" id="url" placeholder="Paste YouTube or M3U8 Link...">
+
+            <div id="source-actions" class="hidden">
+                <button class="btn-change-source" onclick="changeStreamSource()">
+                    🔄 Change Source (Live)
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: OVERLAY EDITOR -->
+    <div class="right-col">
+        <div class="card" id="overlay-card">
+            <div class="card-title">🎨 Overlay & Layout</div>
+
+            <!-- UPLOAD -->
+            <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="uploadOverlay(this)">
+            <div style="display:flex; gap:10px;">
+                <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+                    📂 Upload Local Image
+                </button>
+                <button id="btn-update-overlay" class="btn-update hidden" onclick="updateLiveOverlay()">
+                    ✨ Update Live
+                </button>
+            </div>
+
+            <div class="instructions">
+                Drag red box to move video. Pull corner to resize.
+            </div>
+
+            <div class="editor-wrapper">
+                <div id="editor-container">
+                    <div id="video-box">
+                        Video Layer
+                        <div class="resizer"></div>
+                    </div>
+                    <!-- Overlay Mask -->
+                    <div id="overlay-layer"
+                        style="position: absolute; top:0; left:0; width:100%; height:100%; background-size: cover; background-position: center; pointer-events: none; z-index: 2;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const videoBox = document.getElementById("video-box");
+        const resizer = document.querySelector(".resizer");
+        const statusText = document.getElementById("status-text");
+        const statusDot = document.getElementById("status-dot");
+        const editorContainer = document.getElementById("editor-container");
+
+        const btnToggle = document.getElementById("btn-toggle");
+        const sourceActions = document.getElementById("source-actions");
+        const btnUpdateOverlay = document.getElementById("btn-update-overlay");
+
+        let isActive = false;
+        let pollInterval;
+
+        // --- STATUS & POLL ---
+        function checkStatus() {
+            fetch('/api/status')
+                .then(res => res.json())
+                .then(data => {
+                    isActive = data.active;
+                    updateUIState(isActive);
+                })
+                .catch(err => console.log("Status check failed", err));
+        }
+
+        // Centralized UI Update
+        function updateUIState(active) {
+            if (active) {
+                // UI: Streaming
+                statusText.innerText = "LIVE STREAMING ACTIVE";
+                statusText.style.color = "#00f260";
+                statusDot.classList.add("active");
+
+                // Toggle Button -> STOP
+                btnToggle.className = "btn-toggle-stop";
+                btnToggle.innerHTML = "⏹ STOP STREAM";
+
+                // Show Live Actions
+                sourceActions.classList.remove("hidden");
+                btnUpdateOverlay.classList.remove("hidden");
+
+            } else {
+                // UI: Offline
+                if (statusText.innerText !== "STOPPING...") {
+                    statusText.innerText = "OFFLINE / READY";
+                    statusText.style.color = "#888";
+                }
+                statusDot.classList.remove("active");
+
+                // Toggle Button -> START
+                btnToggle.className = "btn-toggle-start";
+                btnToggle.innerHTML = "▶ START STREAM";
+
+                // Hide Live Actions
+                sourceActions.classList.add("hidden");
+                btnUpdateOverlay.classList.add("hidden");
+            }
+        }
+
+        pollInterval = setInterval(checkStatus, 3000);
+        checkStatus();
+
+
+        // --- MAIN TOGGLE ACTION ---
+        function toggleStream() {
+            if (isActive) {
+                // ACTION: STOP
+                if (!confirm("Are you sure you want to STOP the stream entirely?")) return;
+
+                statusText.innerText = "STOPPING...";
+                btnToggle.enabled = false;
+
+                fetch('/api/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'stop' }) // Force stop backend and YT
+                })
+                    .then(res => res.json())
+                    .then(() => {
+                        isActive = false;
+                        setTimeout(checkStatus, 500); // Quick refresh
+                    });
+
+            } else {
+                // ACTION: START
+                const url = document.getElementById('url').value;
+                if (!url) {
+                    alert("Please enter a Source Link first!");
+                    return;
+                }
+
+                // Calculate Layout
+                const ratio = 3;
+                const layout = {
+                    x: Math.round(videoBox.offsetLeft * ratio),
+                    y: Math.round(videoBox.offsetTop * ratio),
+                    w: Math.round(videoBox.offsetWidth * ratio),
+                    h: Math.round(videoBox.offsetHeight * ratio)
+                };
+
+                statusText.innerText = "STARTING...";
+
+                fetch('/api/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'start', url: url, layout: layout })
+                })
+                    .then(res => res.json())
+                    .then(() => {
+                        // Check status loop will pick it up
+                        setTimeout(checkStatus, 1000);
+                    });
+            }
+        }
+
+        // --- SOURCE CHANGE ---
+        function changeStreamSource() {
+            const url = document.getElementById('url').value;
+            if (!url) {
+                alert("Please enter a new URL in the box first!");
+                return;
+            }
+            if (!confirm("Switch stream source to: " + url + "?")) return;
+
+            statusText.innerText = "SWITCHING SOURCE...";
+            fetch('/api/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'change_source', url: url })
+            })
+                .then(res => res.json())
+                .then(data => statusText.innerText = data.message);
+        }
+
+        // --- OVERLAY UPDATE ---
+        function updateLiveOverlay() {
+            // No strict resume logic in frontend, just trigger it
+            if (!confirm("Update Overlay? This may buffer the stream briefly.")) return;
+            statusText.innerText = "UPDATING OVERLAY...";
+
+            fetch('/api/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_overlay' })
+            })
+                .then(res => res.json())
+                .then(data => statusText.innerText = data.message);
+        }
+
+        // --- UPLOAD ---
+        function uploadOverlay(input) {
+            if (input.files && input.files[0]) {
+                const formData = new FormData();
+                formData.append('overlayImage', input.files[0]);
+
+                statusText.innerText = "Uploading...";
+
+                fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        statusText.innerText = "Overlay Updated!";
+                        // Force refresh background image with timestamp
+                        // Use overlayLayer if it exists, else editorContainer
+                        const targetLayer = document.getElementById("overlay-layer") || editorContainer;
+                        targetLayer.style.backgroundImage = `url('${data.path}?t=${Date.now()}')`;
+
+                        // CHECK IF STREAM IS ACTIVE & UPDATE LAYOUT
+                        fetch('/api/status').then(r => r.json()).then(stat => {
+                            if (stat.active) {
+                                statusText.innerText = "Syncing to Live Stream...";
+
+                                // Calculate Current Layout
+                                const ratio = 3;
+                                const currentLayout = {
+                                    x: Math.round(videoBox.offsetLeft * ratio),
+                                    y: Math.round(videoBox.offsetTop * ratio),
+                                    w: Math.round(videoBox.offsetWidth * ratio),
+                                    h: Math.round(videoBox.offsetHeight * ratio)
+                                };
+
+                                // Trigger Hot Update
+                                fetch('/api/stream', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'update_overlay', layout: currentLayout })
+                                }).then(r => r.json()).then(checkResult);
+                            }
+                        });
+
+
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        statusText.innerText = "Upload Failed";
+                        statusText.style.color = "#ff4444";
+                    });
+            }
+        }
+        // --- EDITOR DRAG & RESIZE (Unchanged Logic, just references) ---
+        let isDragging = false, startX, startY, initialLeft, initialTop;
+        videoBox.addEventListener("mousedown", (e) => {
+            if (e.target === resizer) return;
+            isDragging = true;
+            startX = e.clientX; startY = e.clientY;
+            initialLeft = videoBox.offsetLeft; initialTop = videoBox.offsetTop;
+            document.addEventListener("mousemove", drag);
+            document.addEventListener("mouseup", stopDrag);
+        });
+        function drag(e) {
+            if (!isDragging) return;
+            videoBox.style.left = `${initialLeft + (e.clientX - startX)}px`;
+            videoBox.style.top = `${initialTop + (e.clientY - startY)}px`;
+        }
+        function stopDrag() { isDragging = false; document.removeEventListener("mousemove", drag); }
+
+        let isResizing = false, initW, initH, initX, initY;
+        resizer.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+            isResizing = true;
+            initX = e.clientX; initY = e.clientY;
+            initW = videoBox.offsetWidth; initH = videoBox.offsetHeight;
+            document.addEventListener("mousemove", resize);
+            document.addEventListener("mouseup", stopResize);
+        });
+        function resize(e) {
+            if (!isResizing) return;
+            videoBox.style.width = `${initW + (e.clientX - initX)}px`;
+            videoBox.style.height = `${initH + (e.clientY - initY)}px`;
+        }
+        function stopResize() { isResizing = false; document.removeEventListener("mousemove", resize); }
+
+    </script>
+</body>
+
+</html>
