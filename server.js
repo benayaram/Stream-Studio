@@ -17,6 +17,15 @@ app.use(bodyParser.json());
 const TARGET_URL = process.env.TARGET_URL;
 const STREAM_KEY = process.env.STREAM_KEY;
 const PROXY = process.env.PROXY || "";
+
+// VALIDATION
+if (!TARGET_URL || !STREAM_KEY) {
+    console.error("❌ MISSING CONFIGURATION: TARGET_URL or STREAM_KEY is undefined.");
+    console.error("👉 Please check your .env file.");
+    // Don't exit process, but warn heavily. Stream start will fail anyway.
+} else {
+    console.log(`✅ Configuration Loaded: Target=${TARGET_URL} | Key=****${STREAM_KEY.slice(-4)}`);
+}
 // =======================================
 
 // Path pointers
@@ -254,10 +263,13 @@ function startStream(sourceLink, layout, seekTime = 0) {
     if (PROXY) dlArgs.push('--proxy', PROXY);
 
     // CHECK FOR COOKIES (Fixes "Sign in to confirm you’re not a bot")
+    // Use cookies.txt if it exists. otherwise proceed without cookies (User Request)
     const cookiesPath = path.join(__dirname, 'cookies.txt');
     if (fs.existsSync(cookiesPath)) {
         console.log("🍪 Found cookies.txt! Using for authentication.");
         dlArgs.push('--cookies', cookiesPath);
+    } else {
+        console.log("🍪 No cookies.txt found. Proceeding without authentication (Local Mode).");
     }
 
     dlArgs.push(sourceLink);
@@ -279,12 +291,13 @@ color=s=1080x1920:c=black[bg];
 
         '-filter_complex', filterComplex,
 
-        '-c:v', 'libx264', '-preset', 'veryfast', // 'veryfast' uses less CPU than 'ultrafast' for similar quality, or keep ultrafast if CPU is really tight
-        '-tune', 'zerolatency', // Crucial for low latency and stability
-        '-b:v', '3000k', '-maxrate', '3500k', '-bufsize', '6000k', // Lowered bitrate for stability
+        '-c:v', 'libx264', '-preset', 'veryfast',
+        '-tune', 'zerolatency',
+        '-b:v', '2500k', '-maxrate', '3000k', '-bufsize', '3000k', // Aggressive reduction for 512MB RAM limit
         '-pix_fmt', 'yuv420p', '-g', '60',
+        '-max_muxing_queue_size', '400', // Reduce memory buffering
 
-        '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+        '-c:a', 'aac', '-b:a', '96k', '-ar', '44100', // Lower audio bitrate slightly
         '-shortest', // Stop encoding when shortest input (the video) ends
         '-f', 'flv',
         `${TARGET_URL}/${STREAM_KEY}`
