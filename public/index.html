@@ -252,6 +252,17 @@
             background-position: center;
             border-radius: 16px;
             overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        #editor-container.portrait {
+            width: 360px;
+            height: 640px;
+        }
+
+        #editor-container.landscape {
+            width: 640px;
+            height: 360px;
         }
 
         /* DRAGGABLE VIDEO BOX */
@@ -301,6 +312,31 @@
             transform: scale(1.2);
         }
 
+        .resizer:hover {
+            transform: scale(1.2);
+        }
+
+        /* LOGO BOX */
+        #logo-box {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 100px;
+            height: 100px;
+            background: rgba(0, 255, 255, 0.2);
+            border: 2px solid cyan;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            cursor: move;
+            z-index: 10;
+            /* Highest priority */
+            display: none;
+            /* Hidden by default until uploaded */
+        }
+
+        #logo-box.visible {
+            display: block;
+        }
+
         .hidden {
             display: none !important;
         }
@@ -348,26 +384,54 @@
         <div class="card" id="overlay-card">
             <div class="card-title">🎨 Overlay & Layout</div>
 
-            <!-- UPLOAD -->
-            <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="uploadOverlay(this)">
-            <div style="display:flex; gap:10px;">
-                <button class="btn-upload" onclick="document.getElementById('file-input').click()">
-                    📂 Upload Local Image
-                </button>
+            <!-- ORIENTATION TOGGLE -->
+            <div style="display:flex; gap:10px; margin-bottom: 15px;">
+                <button id="btn-portrait" class="btn-secondary" onclick="setOrientation('portrait')"
+                    style="background: var(--accent-color); color: white;">📱 Portrait</button>
+                <button id="btn-landscape" class="btn-secondary" onclick="setOrientation('landscape')">🖥
+                    Landscape</button>
+            </div>
+
+            <!-- LAYERS MANAGEMENT -->
+            <div
+                style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                <div style="font-size:0.9rem; color:#888;">Manage Layers</div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-upload" onclick="triggerUpload('background')" style="flex:1;">
+                        🖼 Background
+                    </button>
+                    <button class="btn-upload" onclick="triggerUpload('logo')"
+                        style="flex:1; border-color: cyan; color: cyan;">
+                        🆔 Logo Over
+                    </button>
+                </div>
+
                 <button id="btn-update-overlay" class="btn-update hidden" onclick="updateLiveOverlay()">
-                    ✨ Update Live
+                    ✨ Update Live Layers
                 </button>
             </div>
 
+            <!-- HIDDEN INPUTS -->
+            <input type="file" id="file-input-bg" accept="image/*" style="display: none;"
+                onchange="handleUpload(this, 'background')">
+            <input type="file" id="file-input-logo" accept="image/*" style="display: none;"
+                onchange="handleUpload(this, 'logo')">
+
             <div class="instructions">
-                Drag red box to move video. Pull corner to resize.
+                Adjust Video (Red) and Logo (Cyan) layers.
             </div>
 
             <div class="editor-wrapper">
                 <div id="editor-container">
-                    <div id="video-box">
-                        Video Layer
+                    <div id="video-box" style="z-index: 5;">
+                        <span id="video-label">Video Layer</span>
                         <div class="resizer"></div>
+                    </div>
+
+                    <!-- LOGO LAYER -->
+                    <div id="logo-box">
+                        <div class="resizer" style="border-color: cyan;"></div>
                     </div>
                     <!-- Overlay Mask -->
                     <div id="overlay-layer"
@@ -381,7 +445,10 @@
 
     <script>
         const videoBox = document.getElementById("video-box");
-        const resizer = document.querySelector(".resizer");
+        const logoBox = document.getElementById("logo-box");
+        const resizer = document.querySelector("#video-box .resizer");
+        const logoResizer = document.querySelector("#logo-box .resizer");
+
         const statusText = document.getElementById("status-text");
         const statusDot = document.getElementById("status-dot");
         const editorContainer = document.getElementById("editor-container");
@@ -389,6 +456,11 @@
         const btnToggle = document.getElementById("btn-toggle");
         const sourceActions = document.getElementById("source-actions");
         const btnUpdateOverlay = document.getElementById("btn-update-overlay");
+
+        const btnPortrait = document.getElementById("btn-portrait");
+        const btnLandscape = document.getElementById("btn-landscape");
+
+        let currentMode = 'portrait'; // or 'landscape'
 
         let isActive = false;
         let pollInterval;
@@ -422,10 +494,12 @@
 
             } else {
                 // UI: Offline
-                if (statusText.innerText !== "STOPPING...") {
+                if (statusText.innerText === "STOPPING...") {
+                    statusText.innerText = "STREAM STOPPED"; // Final state
+                } else if (statusText.innerText !== "STREAM STOPPED") {
                     statusText.innerText = "OFFLINE / READY";
-                    statusText.style.color = "#888";
                 }
+                statusText.style.color = "#888";
                 statusDot.classList.remove("active");
 
                 // Toggle Button -> START
@@ -440,6 +514,31 @@
 
         pollInterval = setInterval(checkStatus, 3000);
         checkStatus();
+
+
+        // --- ORIENTATION LOGIC ---
+        function setOrientation(mode) {
+            currentMode = mode;
+            editorContainer.className = mode; // portrait or landscape
+
+            // Update Buttons
+            if (mode === 'portrait') {
+                btnPortrait.style.background = 'var(--accent-color)';
+                btnPortrait.style.color = 'white';
+                btnLandscape.style.background = '#333';
+                btnLandscape.style.color = '#ccc';
+
+                // Reset Video Box to safe defaults if needed, or keep it
+                // videoBox.style.width = "260px"; videoBox.style.height = "146px";
+            } else {
+                btnLandscape.style.background = 'var(--accent-color)';
+                btnLandscape.style.color = 'white';
+                btnPortrait.style.background = '#333';
+                btnPortrait.style.color = '#ccc';
+            }
+        }
+        // Initialize
+        setOrientation('portrait');
 
 
         // --- MAIN TOGGLE ACTION ---
@@ -470,7 +569,7 @@
                     return;
                 }
 
-                // Calculate Layout
+                // Calculate Layouts
                 const ratio = 3;
                 const layout = {
                     x: Math.round(videoBox.offsetLeft * ratio),
@@ -478,13 +577,25 @@
                     w: Math.round(videoBox.offsetWidth * ratio),
                     h: Math.round(videoBox.offsetHeight * ratio)
                 };
+                const logoLayout = {
+                    x: Math.round(logoBox.offsetLeft * ratio),
+                    y: Math.round(logoBox.offsetTop * ratio),
+                    w: Math.round(logoBox.offsetWidth * ratio),
+                    h: Math.round(logoBox.offsetHeight * ratio)
+                };
 
                 statusText.innerText = "STARTING...";
 
                 fetch('/api/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'start', url: url, layout: layout })
+                    body: JSON.stringify({
+                        action: 'start',
+                        url: url,
+                        layout: layout,
+                        logoLayout: logoLayout,
+                        mode: currentMode
+                    })
                 })
                     .then(res => res.json())
                     .then(() => {
@@ -519,22 +630,55 @@
             if (!confirm("Update Overlay? This may buffer the stream briefly.")) return;
             statusText.innerText = "UPDATING OVERLAY...";
 
+            const ratio = 3;
+            // 1. Video Layout
+            const layout = {
+                x: Math.round(videoBox.offsetLeft * ratio),
+                y: Math.round(videoBox.offsetTop * ratio),
+                w: Math.round(videoBox.offsetWidth * ratio),
+                h: Math.round(videoBox.offsetHeight * ratio)
+            };
+            // 2. Logo Layout
+            const logoLayout = {
+                x: Math.round(logoBox.offsetLeft * ratio),
+                y: Math.round(logoBox.offsetTop * ratio),
+                w: Math.round(logoBox.offsetWidth * ratio),
+                h: Math.round(logoBox.offsetHeight * ratio)
+            };
+
             fetch('/api/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update_overlay' })
+                body: JSON.stringify({
+                    action: 'update_overlay',
+                    mode: currentMode,
+                    layout: layout,
+                    logoLayout: logoLayout
+                })
             })
                 .then(res => res.json())
                 .then(data => statusText.innerText = data.message);
         }
 
-        // --- UPLOAD ---
-        function uploadOverlay(input) {
+        // --- UPLOAD HANDLERS ---
+        function triggerUpload(type) {
+            if (type === 'background') document.getElementById('file-input-bg').click();
+            if (type === 'logo') document.getElementById('file-input-logo').click();
+        }
+
+        function handleUpload(input, type) {
             if (input.files && input.files[0]) {
                 const formData = new FormData();
                 formData.append('overlayImage', input.files[0]);
+                formData.append('type', type); // Tell backend what this is
 
-                statusText.innerText = "Uploading...";
+                statusText.innerText = `Uploading ${type}...`;
+
+                // Visual feedback immediate
+                if (type === 'background') {
+                    const targetLayer = document.getElementById("overlay-layer") || editorContainer;
+                    targetLayer.style.backgroundImage = 'none';
+                }
 
                 fetch('/api/upload', {
                     method: 'POST',
@@ -542,32 +686,27 @@
                 })
                     .then(res => res.json())
                     .then(data => {
-                        statusText.innerText = "Overlay Updated!";
-                        // Force refresh background image with timestamp
-                        // Use overlayLayer if it exists, else editorContainer
-                        const targetLayer = document.getElementById("overlay-layer") || editorContainer;
-                        targetLayer.style.backgroundImage = `url('${data.path}?t=${Date.now()}')`;
+                        statusText.innerText = `${type.toUpperCase()} Updated!`;
+
+                        if (data.type === 'background') {
+                            const targetLayer = document.getElementById("overlay-layer") || editorContainer;
+                            targetLayer.style.backgroundImage = `url('${data.path}?t=${Date.now()}')`;
+                        }
+
+                        if (data.type === 'logo') {
+                            // Show logo box and set image
+                            logoBox.classList.add('visible');
+                            logoBox.style.backgroundImage = `url('${data.path}?t=${Date.now()}')`;
+                            logoBox.style.backgroundSize = 'contain';
+                            logoBox.style.backgroundRepeat = 'no-repeat';
+                            logoBox.style.backgroundPosition = 'center';
+                        }
 
                         // CHECK IF STREAM IS ACTIVE & UPDATE LAYOUT
                         fetch('/api/status').then(r => r.json()).then(stat => {
                             if (stat.active) {
-                                statusText.innerText = "Syncing to Live Stream...";
-
-                                // Calculate Current Layout
-                                const ratio = 3;
-                                const currentLayout = {
-                                    x: Math.round(videoBox.offsetLeft * ratio),
-                                    y: Math.round(videoBox.offsetTop * ratio),
-                                    w: Math.round(videoBox.offsetWidth * ratio),
-                                    h: Math.round(videoBox.offsetHeight * ratio)
-                                };
-
-                                // Trigger Hot Update
-                                fetch('/api/stream', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ action: 'update_overlay', layout: currentLayout })
-                                }).then(r => r.json()).then(checkResult);
+                                statusText.innerText = "Syncing Layers...";
+                                updateLiveOverlay(); // Re-use the update function which now includes all layouts
                             }
                         });
 
@@ -580,38 +719,54 @@
                     });
             }
         }
-        // --- EDITOR DRAG & RESIZE (Unchanged Logic, just references) ---
-        let isDragging = false, startX, startY, initialLeft, initialTop;
-        videoBox.addEventListener("mousedown", (e) => {
-            if (e.target === resizer) return;
-            isDragging = true;
-            startX = e.clientX; startY = e.clientY;
-            initialLeft = videoBox.offsetLeft; initialTop = videoBox.offsetTop;
-            document.addEventListener("mousemove", drag);
-            document.addEventListener("mouseup", stopDrag);
-        });
-        function drag(e) {
-            if (!isDragging) return;
-            videoBox.style.left = `${initialLeft + (e.clientX - startX)}px`;
-            videoBox.style.top = `${initialTop + (e.clientY - startY)}px`;
-        }
-        function stopDrag() { isDragging = false; document.removeEventListener("mousemove", drag); }
 
-        let isResizing = false, initW, initH, initX, initY;
-        resizer.addEventListener("mousedown", (e) => {
-            e.stopPropagation();
-            isResizing = true;
-            initX = e.clientX; initY = e.clientY;
-            initW = videoBox.offsetWidth; initH = videoBox.offsetHeight;
-            document.addEventListener("mousemove", resize);
-            document.addEventListener("mouseup", stopResize);
-        });
-        function resize(e) {
-            if (!isResizing) return;
-            videoBox.style.width = `${initW + (e.clientX - initX)}px`;
-            videoBox.style.height = `${initH + (e.clientY - initY)}px`;
+        // --- DRAG & RESIZE FACTORY ---
+        function makeDraggable(el, resizerEl) {
+            let isDragging = false, startX, startY, initialLeft, initialTop;
+
+            el.addEventListener("mousedown", (e) => {
+                if (e.target === resizerEl) return;
+                isDragging = true;
+                startX = e.clientX; startY = e.clientY;
+                initialLeft = el.offsetLeft; initialTop = el.offsetTop;
+
+                const onMove = (e) => {
+                    if (!isDragging) return;
+                    el.style.left = `${initialLeft + (e.clientX - startX)}px`;
+                    el.style.top = `${initialTop + (e.clientY - startY)}px`;
+                };
+                const onUp = () => { isDragging = false; document.removeEventListener("mousemove", onMove); };
+
+                document.addEventListener("mousemove", onMove);
+                document.addEventListener("mouseup", onUp);
+            });
+
+            // Re-size logic
+            let isResizing = false, initW, initH, initX, initY;
+            resizerEl.addEventListener("mousedown", (e) => {
+                e.stopPropagation();
+                isResizing = true;
+                initX = e.clientX; initY = e.clientY;
+                initW = el.offsetWidth; initH = el.offsetHeight;
+
+                const onResize = (e) => {
+                    if (!isResizing) return;
+                    el.style.width = `${initW + (e.clientX - initX)}px`;
+                    el.style.height = `${initH + (e.clientY - initY)}px`;
+                };
+                const onUpResize = () => { isResizing = false; document.removeEventListener("mousemove", onResize); };
+
+                document.addEventListener("mousemove", onResize);
+                document.addEventListener("mouseup", onUpResize);
+            });
         }
-        function stopResize() { isResizing = false; document.removeEventListener("mousemove", resize); }
+
+        // Initialize Draggables
+        makeDraggable(videoBox, resizer);
+        makeDraggable(logoBox, logoResizer);
+
+        // Remove old global event listeners that were hardcoded for videoBox only
+        // (They are replaced by the factory above)
 
     </script>
 </body>

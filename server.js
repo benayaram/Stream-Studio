@@ -41,7 +41,7 @@ let overlayPath = path.join(__dirname, 'overlay.png');
 
 // --- STATE MANAGEMENT ---
 let activeProcess = { dl: null, ff: null };
-let currentStreamConfig = { url: null, layout: null };
+let currentStreamConfig = { url: null, layout: null, mode: 'portrait', background: null, logo: null, logoLayout: null };
 let streamStartTime = 0; // Timestamp when ORIGINAL stream started
 
 // --- MULTER SETUP (File Uploads) ---
@@ -57,8 +57,9 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         // Keep original name or timestamp to avoid cache
+        const typePrefix = req.body.type === 'logo' ? 'logo-' : 'bg-';
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
+        cb(null, typePrefix + uniqueSuffix + path.extname(file.originalname));
     }
 });
 const upload = multer({ storage: storage });
@@ -109,32 +110,49 @@ function ensureNetscapeCookies() {
 ensureNetscapeCookies();
 
 
-// Endpoint to upload a new overlay
+// Endpoint to upload a new asset (Background or Logo)
 app.post('/api/upload', upload.single('overlayImage'), (req, res) => {
     if (!req.file) {
         return res.status(400).send('No file uploaded.');
     }
-    // Update the global overlay path to the new file
-    overlayPath = req.file.path;
-    console.log(`✅ New overlay set: ${overlayPath} `);
+
+    const type = req.body.type || 'background'; // 'background' or 'logo'
+    const newPath = req.file.path;
+    const isLogo = type === 'logo';
+
+    console.log(`✅ New ${type} uploaded: ${newPath}`);
+
+    // Cleanup previous file of the SAME TYPE
+    const oldPath = isLogo ? currentStreamConfig.logo : currentStreamConfig.background;
+
+    // Only delete if it was an uploaded file (in uploads/ folder) and exists
+    if (oldPath && oldPath.includes('uploads') && fs.existsSync(oldPath)) {
+        try {
+            fs.unlinkSync(oldPath);
+            console.log(`🗑 Deleted old ${type}: ${oldPath}`);
+        } catch (e) {
+            console.error(`⚠️ Failed to delete old ${type}:`, e.message);
+        }
+    }
+
+    // Update Global State
+    if (isLogo) {
+        currentStreamConfig.logo = newPath;
+    } else {
+        currentStreamConfig.background = newPath;
+        // Also update legacy variable for backward compat if needed, or just rely on state
+        overlayPath = newPath;
+    }
 
     // Return relative path for frontend preview
     res.json({
-        message: 'Overlay updated!',
-        path: `/uploads/${req.file.filename}`
+        message: `${isLogo ? 'Logo' : 'Background'} updated!`,
+        path: `/uploads/${req.file.filename}`,
+        type: type
     });
 });
 
-// Endpoint to serve the CURRENT overlay image (dynamic)
-app.get('/overlay_preview', (req, res) => {
-    if (fs.existsSync(overlayPath)) {
-        res.sendFile(overlayPath);
-    } else {
-        res.status(404).send("Overlay image not found.");
-    }
-});
-
-// Endpoint to check if stream is active
+// Endpoint to serve the CURRENT stats
 app.get('/api/status', (req, res) => {
     // Check purely based on if the process object exists
     res.json({
@@ -148,8 +166,12 @@ app.post('/api/stream', (req, res) => {
 
     if (action === 'stop') {
         killStream();
+        killStream();
         // Clear config only on manual stop
-        currentStreamConfig = { url: null, layout: null };
+        // Don't fully clear state, maybe keep images for next run? 
+        // For now, reset core stream params but keep images if desired by user logic.
+        // But user asked to "reset". Let's reset stream specific stuff.
+        currentStreamConfig.url = null;
         streamStartTime = 0;
         return res.json({ message: "⛔ Stream Stopped" });
     }
@@ -158,12 +180,18 @@ app.post('/api/stream', (req, res) => {
         killStream();
         // Default safe layout if none provided
         const safeLayout = layout || { x: 0, y: 500, w: 1080, h: 607 };
+        const safeMode = req.body.mode || 'portrait';
+        // Logo layout (optional)
+        if (req.body.logoLayout) currentStreamConfig.logoLayout = req.body.logoLayout;
+
+        // Ensure background is set (default if null)
+        if (!currentStreamConfig.background) currentStreamConfig.background = path.join(__dirname, 'overlay.png');
 
         // Reset timer on fresh start
         streamStartTime = Date.now();
 
         // Small delay to ensure previous FFmpeg closes
-        setTimeout(() => startStream(url, safeLayout, 0), 1000);
+        setTimeout(() => startStream(url, safeLayout, 0, safeMode), 1000);
         return res.json({ message: "✅ Starting Stream..." });
     }
 
@@ -178,8 +206,9 @@ app.post('/api/stream', (req, res) => {
 
         // Use existing layout if not provided (safety)
         const layoutToUse = currentStreamConfig.layout || { x: 0, y: 500, w: 1080, h: 607 };
+        const modeToUse = currentStreamConfig.mode || 'portrait';
 
-        setTimeout(() => startStream(url, layoutToUse, 0), 1000);
+        setTimeout(() => startStream(url, layoutToUse, 0, modeToUse), 1000);
         return res.json({ message: "✅ Stream Source Changed!" });
     }
 
@@ -193,6 +222,12 @@ app.post('/api/stream', (req, res) => {
             console.log(`📝 Received new layout:`, layout);
             currentStreamConfig.layout = layout;
         }
+        if (req.body.logoLayout) {
+            currentStreamConfig.logoLayout = req.body.logoLayout;
+        }
+        if (req.body.mode) {
+            currentStreamConfig.mode = req.body.mode;
+        }
 
         // CALCULATE RESUME TIME
         const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
@@ -203,8 +238,8 @@ app.post('/api/stream', (req, res) => {
         // Force a small delay to ensure cleanup
         setTimeout(() => {
             if (currentStreamConfig.url && currentStreamConfig.layout) {
-                startStream(currentStreamConfig.url, currentStreamConfig.layout, elapsedSeconds);
-                return res.json({ message: "✅ Overlay & Layout Updated (Resuming...)" });
+                startStream(currentStreamConfig.url, currentStreamConfig.layout, elapsedSeconds, currentStreamConfig.mode);
+                return res.json({ message: "✅ Layers Updated (Resuming...)" });
             } else {
                 return res.status(500).json({ message: "❌ Missing stream config for restart." });
             }
@@ -235,12 +270,15 @@ function killStream() {
     console.log("Stopped previous stream processes (Force Kill).");
 }
 
-function startStream(sourceLink, layout, seekTime = 0) {
+function startStream(sourceLink, layout, seekTime = 0, mode = 'portrait') {
     // Store current config for restarts
-    currentStreamConfig = { url: sourceLink, layout: layout };
+    currentStreamConfig.url = sourceLink;
+    currentStreamConfig.layout = layout;
+    currentStreamConfig.mode = mode;
+
     const startTimeAttempt = Date.now();
 
-    console.log(`🚀 Starting Stream. Seek: ${seekTime}s. Layout: X=${layout.x}, Y=${layout.y}, W=${layout.w}, H=${layout.h}`);
+    console.log(`🚀 Starting Stream. Seek: ${seekTime}s. Mode: ${mode}. Layout: X=${layout.x}, Y=${layout.y}, W=${layout.w}, H=${layout.h}`);
 
     // 1. Configure Downloader (yt-dlp)
     // Try to look like a real browser to avoid "Sign in" errors
@@ -249,6 +287,8 @@ function startStream(sourceLink, layout, seekTime = 0) {
     let dlArgs = [
         '-o', '-',
         '-f', 'best[height<=1080]',
+        '--retries', 'infinite',
+        '--fragment-retries', 'infinite',
         '--no-part',
         '--user-agent', userAgent,
         '--referer', 'https://www.youtube.com/'
@@ -277,31 +317,51 @@ function startStream(sourceLink, layout, seekTime = 0) {
     activeProcess.dl = spawn(ytPath, dlArgs);
 
     // 2. Configure FFmpeg (The Mixer)
-    const filterComplex = `
-color=s=1080x1920:c=black[bg];
-[0:v]scale=${layout.w}:${layout.h}[vid];
-[bg][vid]overlay=${layout.x}:${layout.y}[layer1];
-[layer1][1:v]overlay=0:0
-    `.replace(/\s/g, '');
+    const canvasSize = mode === 'landscape' ? '1920x1080' : '1080x1920';
+    const bgPath = currentStreamConfig.background || path.join(__dirname, 'overlay.png');
+    const hasLogo = !!currentStreamConfig.logo;
+    const logoLayout = currentStreamConfig.logoLayout || { x: 0, y: 0, w: 200, h: 200 };
 
-    activeProcess.ff = spawn(ffmpegPath, [
+    let ffmpegArgs = [
         '-re',
         '-i', 'pipe:0',                  // Input 0: Video Pipe
-        '-loop', '1', '-i', overlayPath, // Input 1: Overlay Image
+        '-loop', '1', '-i', bgPath,      // Input 1: Background Layer
+    ];
 
-        '-filter_complex', filterComplex,
+    if (hasLogo) {
+        ffmpegArgs.push('-loop', '1', '-i', currentStreamConfig.logo); // Input 2: Logo Layer
+    }
 
+    // FILTER LOGIC:
+    // [1:v] (Background) -> [bg_final]
+    // [0][v] (Video) -> [vid]
+    // [bg_final][vid]overlay -> [layer1]
+    // [layer1][2:v]overlay -> [out] (if logo)
+
+    let finalFilter = `[1:v]scale=${canvasSize}[bg_final];[0:v]scale=${layout.w}:${layout.h}[vid];[bg_final][vid]overlay=${layout.x}:${layout.y}`;
+
+    if (hasLogo) {
+        // Correctly label the first overlay output as [layer1] so the second one can pick it up
+        finalFilter = `[1:v]scale=${canvasSize}[bg_final];[0:v]scale=${layout.w}:${layout.h}[vid];[bg_final][vid]overlay=${layout.x}:${layout.y}[layer1]`;
+        finalFilter += `;[2:v]scale=${logoLayout.w}:${logoLayout.h}[logo_final];[layer1][logo_final]overlay=${logoLayout.x}:${logoLayout.y}`;
+    }
+
+    // Replace our args
+    ffmpegArgs.push(
+        '-filter_complex', finalFilter,
         '-c:v', 'libx264', '-preset', 'veryfast',
         '-tune', 'zerolatency',
-        '-b:v', '2500k', '-maxrate', '3000k', '-bufsize', '3000k', // Aggressive reduction for 512MB RAM limit
+        '-b:v', '2500k', '-maxrate', '3000k', '-bufsize', '3000k',
         '-pix_fmt', 'yuv420p', '-g', '60',
-        '-max_muxing_queue_size', '400', // Reduce memory buffering
+        '-max_muxing_queue_size', '400',
 
-        '-c:a', 'aac', '-b:a', '96k', '-ar', '44100', // Lower audio bitrate slightly
-        '-shortest', // Stop encoding when shortest input (the video) ends
+        '-c:a', 'aac', '-b:a', '96k', '-ar', '44100',
+        '-shortest',
         '-f', 'flv',
         `${TARGET_URL}/${STREAM_KEY}`
-    ]);
+    );
+
+    activeProcess.ff = spawn(ffmpegPath, ffmpegArgs);
 
     // Pipe Downloader -> FFmpeg
     activeProcess.dl.stdout.pipe(activeProcess.ff.stdin);
@@ -376,7 +436,7 @@ color=s=1080x1920:c=black[bg];
 
             // Allow a moment, then restart fresh (lose progress, but keep stream alive)
             setTimeout(() => {
-                startStream(sourceLink, layout, 0); // Recursive retry with 0 seek
+                startStream(sourceLink, layout, 0, mode); // Recursive retry with 0 seek
             }, 1000);
             return;
         }
